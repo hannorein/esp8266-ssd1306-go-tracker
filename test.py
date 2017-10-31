@@ -1,4 +1,10 @@
 # Create an image
+from datetime import datetime
+from pytz import timezone    
+et = timezone('US/Eastern')
+et_time = datetime.now(et)
+
+
 from PIL import Image, ImageDraw, ImageFont
 image = Image.new("1", (128,32),(1))
 draw = ImageDraw.Draw(image)
@@ -6,31 +12,38 @@ font = ImageFont.truetype("small_pixel.ttf", 8)
 
 # Pull data from GoTracker Website
 import urllib2
-url = "http://gotracker.ca/GoTracker/mobile/StationStatus/Service/09/Station/16"
+url = "http://gotracker.ca/GoTracker/mobile/StationStatus/Service/09/Station/12"
 output = urllib2.urlopen(url).read()
 from bs4 import BeautifulSoup
 soup = BeautifulSoup(output, 'html.parser')
 times = []
 expec = []
-for trip in soup.find_all('td',{'class':'colTripScheduled'}):
-	times.append(trip.text)
-for trip in soup.find_all('td',{'class':'colTripExpected'}):
-	expec.append(trip.text)
+start = soup.find("th",text="Eastbound towards Oshawa").parent
+for i in range(4):
+	try:
+		start = start.next_sibling
+		trip = start.find('td',{'class':'colTripScheduled'})
+		times.append(trip.text)
+		trip = start.find('td',{'class':'colTripExpected'})
+		expec.append(trip.text)
+	except:
+		break
 comb = zip(times,expec)
 
 # Render website data to image
-y = -1
+y = -4
 count = 0
 for row in comb:
 	if count <4:
 		text = "%s %s"%row
 		print(text)
 		t,s = row
-		draw.text((52, y), t, (0), font=font)
-		draw.text((84, y), s, (0), font=font)
+		draw.text((54, y), t, (0), font=font)
+		draw.text((86, y), s, (0), font=font)
 		y+= 7
 	count += 1
-draw.text((4,21), "Rouge Hill", (0), font=font)
+ct = et_time.strftime("%H:%M")
+draw.text((0,21), "Now: %s"%ct, (0), font=font)
 b = image.tobytes()
 
 # Bit flips 
