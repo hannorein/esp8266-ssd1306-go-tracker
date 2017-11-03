@@ -1,6 +1,4 @@
 # Create an image
-import xml.etree.ElementTree
-e = xml.etree.ElementTree.parse('thefile.xml').getroot()
 from datetime import datetime
 from pytz import timezone    
 et = timezone('US/Eastern')
