@@ -1,4 +1,6 @@
 # Create an image
+import xml.etree.ElementTree
+e = xml.etree.ElementTree.parse('thefile.xml').getroot()
 from datetime import datetime
 from pytz import timezone    
 et = timezone('US/Eastern')
@@ -13,12 +15,12 @@ font = ImageFont.truetype("small_pixel.ttf", 8)
 # Pull data from GoTracker Website
 import urllib2
 url = "http://gotracker.ca/GoTracker/mobile/StationStatus/Service/09/Station/12"
-output = urllib2.urlopen(url).read()
+output = urllib2.urlopen(url, timeout=160).read()
 from bs4 import BeautifulSoup
 soup = BeautifulSoup(output, 'html.parser')
 times = []
 expec = []
-start = soup.find("th",text="Eastbound towards Oshawa").parent
+start = soup.find("td",text="Eastbound towards Oshawa").parent
 for i in range(4):
 	try:
 		start = start.next_sibling
