@@ -1,0 +1,172 @@
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
+#include <ESP8266HTTPClient.h>
+
+// Uses the esp8266-oled-ssd1306 library
+// https://github.com/ThingPulse/esp8266-oled-ssd1306
+#include <Wire.h>  
+#include "SSD1306Wire.h" 
+#define go_width 64
+#define go_height 32
+char go_bits[] = {
+  0xFF, 0xCC, 0xFF, 0xFF, 0xC0, 0xFF, 0xFF, 0xFF, 0x3F, 0x0C, 0xFE, 0x1F,
+  0x00, 0xFF, 0xFF, 0xFF, 0x1F, 0x0C, 0xFE, 0x1F, 0x00, 0xFE, 0xFF, 0xFF,
+  0x0F, 0x0C, 0xFC, 0x0F, 0x00, 0xFC, 0xFF, 0xFF, 0x07, 0x0C, 0xF8, 0x07,
+  0x00, 0xF8, 0xFF, 0xFF, 0x03, 0x0C, 0xF0, 0x03, 0x00, 0xF0, 0xFF, 0xFF,
+  0x01, 0x0C, 0xE0, 0x01, 0x00, 0xE0, 0xFF, 0xFF, 0x01, 0x0C, 0xE0, 0x01,
+  0x00, 0xE0, 0xFF, 0xFF, 0x00, 0x0C, 0xC0, 0x00, 0x00, 0xC0, 0xFF, 0xFF,
+  0x00, 0x0C, 0xC0, 0x01, 0x00, 0xC0, 0xFF, 0xFF, 0x00, 0xFC, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x0C, 0xC0, 0x01, 0x00, 0xC0, 0xFF, 0xFF, 0x00, 0x0C, 0xC0, 0x00,
+  0x00, 0xC0, 0xFF, 0xFF, 0x01, 0x0C, 0xC0, 0x01, 0x00, 0xE0, 0xFF, 0xFF,
+  0x01, 0x0C, 0xC0, 0x01, 0x00, 0xE0, 0xFF, 0xFF, 0x01, 0x0C, 0xC0, 0x03,
+  0x00, 0xE0, 0xFF, 0xFF, 0x07, 0x0C, 0xC0, 0x07, 0x00, 0xF8, 0xFF, 0xFF,
+  0x0F, 0x0C, 0xC0, 0x0F, 0x00, 0xF8, 0xFF, 0xFF, 0x1F, 0x0C, 0xC0, 0x1F,
+  0x00, 0xFE, 0xFF, 0xFF, 0x3F, 0x0C, 0xC0, 0x1F, 0x00, 0xFF, 0xFF, 0xFF,
+  0xFF, 0x0C, 0xC0, 0xFF, 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, };
+
+// Pin connections
+// D3 -> SDA
+// D4 -> SCL
+
+// Initialize the OLED display using Wire library
+SSD1306Wire  display(0x3c, D3, D4,GEOMETRY_128_32);
+
+ESP8266WiFiMulti WiFiMulti;
+
+void slide(){
+  for(int i=0;i<128;i++){
+    display.clear();
+    display.drawXbm(i, 0, go_width, go_height, (const uint8_t*)go_bits);
+    display.display();
+    delay(10);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  for (int i = 0;i<go_width*go_height/8;i++){
+     go_bits[i] = ~go_bits[i];
+  }
+  
+  display.init();
+  display.clear();
+
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_16);
+  
+  WiFiMulti.addAP("miller", "welcomehomehr");
+
+  slide();
+
+}
+
+int status = 0;
+int timer = 0;
+int loops2refresh = 0;
+unsigned char schedule[128*32/8];
+unsigned char temperature[128*32/8];
+
+int displaySlowDown = 4;
+int getShift(int timer){
+  int shift = 0;
+  if (timer<128){
+    shift = -128+timer;
+  }else if (timer<(1+displaySlowDown)*128){
+    shift = 0;
+    display.drawLine(0, 31, (timer-128)/displaySlowDown, 31);
+  }else if (timer<(2+displaySlowDown)*128){
+    shift = timer-(1+displaySlowDown)*128;
+  }
+  return shift;
+}
+
+void loop() {
+  if (status==0){
+    display.clear();
+    display.drawXbm(0, 0, go_width, go_height, (const uint8_t*)go_bits);
+    display.drawString(56,6,"Wifi...");
+    if((WiFiMulti.run() == WL_CONNECTED)) {
+      status = 1;
+      if (status!=3){
+        HTTPClient http;
+        Serial.println("Getting data... ");
+        http.begin("http://hanno-rein.de/go/danforth.xbm");
+        if(http.GET() > 0) {
+          String payload = http.getString();
+          payload.getBytes(schedule,128*32/8);
+          for (int i=0;i<128*32/8;i++){
+              schedule[i] = ~schedule[i];
+          }
+        }else{
+          status = 3;
+        }
+        http.end(); 
+      }
+      if (status!=3){
+        HTTPClient http;
+        http.begin("http://hanno-rein.de/go/temp.xbm");
+        if(http.GET() > 0) {
+          String payload = http.getString();
+          payload.getBytes(temperature,128*32/8);
+          for (int i=0;i<128*32/8;i++){
+              temperature[i] = ~temperature[i];
+          }
+        }else{
+          status = 3; 
+        }
+        http.end(); 
+      }
+      if (status!=3){
+        status = 4;
+      }
+    }
+  }
+  if (status==3){
+    display.clear();
+    display.drawString(0,0,"HTTP error 2.");
+  }
+  if (status==4){
+    display.clear();
+    int shift = getShift(timer);
+    display.drawXbm(shift, 0, go_width, go_height, (const uint8_t*)go_bits);
+    display.drawXbm(shift, 0, 128, 32, schedule);   
+
+    timer += 1;
+    if (timer>(2+displaySlowDown)*128){
+      timer = 0;
+      status++;
+    }
+  }
+  if (status==5){
+    display.clear();
+    int shift = getShift(timer);
+    display.drawXbm(shift, 0, 128, 32, temperature);
+
+    timer += 1;
+    if (timer>(2+displaySlowDown)*128){
+      display.clear();
+      timer = 0;
+      status++;
+    }
+  }
+  if (status>=6){
+    if (loops2refresh==0){
+      loops2refresh = 2;
+      status = 0;
+    }else{
+      loops2refresh -= 1;
+      status = 4;
+    }
+  }
+  display.display();
+  delay(5);
+}
