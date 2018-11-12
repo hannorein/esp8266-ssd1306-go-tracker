@@ -72,8 +72,8 @@ void setup() {
 int status = 0;
 int timer = 0;
 int loops2refresh = 0;
-unsigned char schedule[128*32/8];
-unsigned char temperature[128*32/8];
+unsigned char schedule[128*32/8+1];
+unsigned char temperature[128*32/8+1];
 
 int displaySlowDown = 4;
 int getShift(int timer){
@@ -93,7 +93,7 @@ void loop() {
   if (status==0){
     display.clear();
     display.drawXbm(0, 0, go_width, go_height, (const uint8_t*)go_bits);
-    display.drawString(56,6,"Wifi...");
+    display.drawString(56,5,"Wifi...");
     if((WiFiMulti.run() == WL_CONNECTED)) {
       status = 1;
       if (status!=3){
@@ -102,7 +102,7 @@ void loop() {
         http.begin("http://hanno-rein.de/go/danforth.xbm");
         if(http.GET() > 0) {
           String payload = http.getString();
-          payload.getBytes(schedule,128*32/8);
+          payload.getBytes(schedule,128*32/8+1);
           for (int i=0;i<128*32/8;i++){
               schedule[i] = ~schedule[i];
           }
@@ -116,7 +116,7 @@ void loop() {
         http.begin("http://hanno-rein.de/go/temp.xbm");
         if(http.GET() > 0) {
           String payload = http.getString();
-          payload.getBytes(temperature,128*32/8);
+          payload.getBytes(temperature,128*32/8+1);
           for (int i=0;i<128*32/8;i++){
               temperature[i] = ~temperature[i];
           }
@@ -133,6 +133,10 @@ void loop() {
   if (status==3){
     display.clear();
     display.drawString(0,0,"HTTP error 2.");
+    display.display();
+    delay(5000);
+    slide();
+    status = 0;
   }
   if (status==4){
     display.clear();
