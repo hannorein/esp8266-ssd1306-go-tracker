@@ -66,7 +66,7 @@ from bs4 import BeautifulSoup
 soup = BeautifulSoup(output, 'html.parser')
 times = []
 expec = []
-start = soup.find("td",text="Eastbound towards Oshawa").parent
+start = soup.find("th",text="Eastbound towards Oshawa").parent
 for i in range(4):
 	try:
 		start = start.next_sibling
